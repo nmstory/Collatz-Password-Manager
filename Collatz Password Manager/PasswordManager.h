@@ -58,7 +58,7 @@ public:
 	int CollatzConjecture(int value);
 private:
 	std::string GenerateEncryption(const std::vector<unsigned int>& unencryptedPassword);
-	std::string GenerateEncryption(const std::string str);
+	bool TestEncryption(std::string encryption, int min, int max);
 	std::vector<unsigned int> StringToVector(std::string str); // Change this from relying on a function to a custom cast/friend function?
 	std::fstream* passwordFile;
 	std::map<std::string, std::string> details; //RENAME!

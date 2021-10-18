@@ -2,6 +2,7 @@
 #include <random>
 #include <sstream>
 #include <vector> // not using array, as it's size must be known at compile time
+#include <chrono>
 
 int main() {
 	PasswordManager pm;
@@ -34,7 +35,6 @@ int main() {
 	
 	return 0;
 }
-
 
 PasswordManager::PasswordManager() {
 	passwordFile = new std::fstream;
@@ -90,7 +90,7 @@ void PasswordManager::CreateUsernamePassword() {
 	int offset = 0;
 
 	// Adding to offset then adding to string
-	std::string encryptedPassword = GenerateEncryption(unencryptedPass);
+	std::string encryptedPassword = GenerateEncryption(StringToVector(unencryptedPass));
 
 	passwordFile->clear();
 	*passwordFile << "" << username << " " << encryptedPassword << std::endl;
@@ -109,7 +109,7 @@ void PasswordManager::CheckUsernamePassword() {
 		for (int i = 0; i < 3; ++i) {
 			std::cout << "Please enter the new password: ";
 			std::cin >> unencryptedPass;
-			std::string encryptedPassword = GenerateEncryption(unencryptedPass);
+			std::string encryptedPassword = GenerateEncryption(StringToVector(unencryptedPass));
 
 			if (details[username] == encryptedPassword) {
 				std::cout << "success!" << std::endl;
@@ -135,6 +135,7 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 	std::uniform_int_distribution<> randomChar(0, 9); // define the range
 
 	//clear file first?
+
 	// Randomly choosing the ten characters
 	char characters[10];
 	for (int i = 0; i < 10; ++i) characters[i] = static_cast<int>(tenLowercase(gen)); // only choosing once, as it helps with efficiency of password generation
@@ -145,22 +146,21 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 
 		int passwordLength = i / 100;
 		(i % 100 == 0) ? passwordLength : passwordLength++;
+		std::cout << i << std::endl;
 
 		for (int j = 0; j < passwordLength; ++j) {
-			unencryptedPass.push_back(randomChar(gen));
+			unencryptedPass.push_back(characters[randomChar(gen)]);
 		}
 
 		passwordStrengthFile << GenerateEncryption(unencryptedPass) << std::endl;
 	}
 
 	// Second 10000
-	std::uniform_int_distribution<> randomChar2(0, 255); // better way to do this?
-
-	passwordStrengthFile << "starting second section" << std::endl;
+	std::uniform_int_distribution<> randomChar2(1, 255); // 0 is undefined behaviour
 
 	for (int i = 0; i < 10000; ++i) {
-
-		bool repeatedCharacters[256] = { false }; // declare outside for loop and reset to false at end of each for?
+		std::cout << i << std::endl;
+		bool repeatedCharacters[256] = { false };
 
 		int passwordLength = i / 100;
 		(i % 100 == 0) ? passwordLength : passwordLength++;
@@ -176,6 +176,9 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 					repeatedCharacters[randomValue] = true;
 					placed = true;
 				}
+				else {
+					randomValue = randomChar2(gen); // else, generate new random value
+				}
 			}
 		}
 		if (unencryptedPass.size() != 0) passwordStrengthFile << GenerateEncryption(unencryptedPass) << std::endl;
@@ -183,60 +186,83 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 }
 
 void PasswordManager::AnalysePasswordStrengthFile() {
-	bool c = false;
-	std::string encryption = "118114";
+	std::fstream passwordStrengthFile("passwordtest.txt", std::ios_base::in);
+	unsigned int tests = 0;
+	unsigned int success = 0;
 
-	/*
-		Cracking idea 1:
-		1. Using the size of the encyption for guidance, generate random strings
-		2. Encrypt the string and see if it matches
+	auto start = std::chrono::high_resolution_clock::now();
 
-		Cracking idea 2:
-		1. take front two numbers and find a value that takes that many steps
-		2. Translate that value to ascii
-		3. remove the two values from encryption and repeat
+	std::string line;
 
-		Q. First set are restricted to ten lowercase characters, how can I use this to crack the passwords?
-		Q. How would I detect how many integers are a part of that character (1, 2 or 3)?
+	for (int i = 0; i < 10000; ++i) {
+		std::getline(passwordStrengthFile, line);
+		tests++;
 
+		if (TestEncryption(line, 97, 127)) success++;
 
-		Basis of testing:
-		* Repeated characters - must be easier to crack
-		* If you know they're lowercase letters (what kind of checks could you run?) - must be easier to crack
-		* Having a rough idea of the length of the password (10 character encryption, so maximum 10 letter password to guess)
-		* 
-	*/
+		if (i % 100 == 0) {
+			auto stop = std::chrono::high_resolution_clock::now();
+			int pc = (((double) success / (double) tests) * 100);
+			std::cout << "After " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms, the success rate of " << i << " easy passwords is: " << pc << "%" << std::endl;
+		}
+	}
 
+	start = std::chrono::high_resolution_clock::now();
 
-	while (!c) {
-		std::string firstTwo = encryption.substr(0, 2);
+	for (int i = 0; i < 10000; ++i) {
+		std::getline(passwordStrengthFile, line);
+		tests++;
 
-		//int ascii = static_cast<std::string>(firstTwo);
+		if (TestEncryption(line, 1, 255)) success++;
+
+		if (i % 100 == 0) {
+			auto stop = std::chrono::high_resolution_clock::now();
+			int pc = (((double)success / (double)tests) * 100);
+			std::cout << "After " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms, the success rate of " << i << " hard passwords is: " << pc << "%" << std::endl;
+		}
 	}
 }
-/*
+
+bool PasswordManager::TestEncryption(std::string encryption, int min, int max) {
+	bool cracked = false;
+	unsigned int c = min;
+	std::string decrypted = "";
+
+	while (!cracked) {
+		std::string tempdecrypt = decrypted + ((char)c);
+		std::string tempencrypted = GenerateEncryption(StringToVector(tempdecrypt));
+
+		if (tempencrypted == encryption.substr(0, tempencrypted.size())) {
+			decrypted = tempdecrypt;
+			c = 97;
+
+			if (tempencrypted == encryption) {
+				cracked = true;
+			}
+
+			continue;
+		}
+
+		if (c == max) {
+			if (decrypted != "") decrypted = decrypted.substr(0, decrypted.size() - 1);
+			return false;
+		}
+
+		++c;
+	}
+
+	return true;
+}
+
 std::vector<unsigned int> PasswordManager::StringToVector(std::string str) {
-	std::vector<unsigned int> v;
-
+	std::vector<unsigned int> unencryptedPassword;
+	
 	for (char& c : str) {
-		v.push_back(c);
-	}
-}*/
-
-std::string PasswordManager::GenerateEncryption(const std::string unencryptedPassword) {
-	int offset = 0;
-	std::string encryptedPassword = "";
-
-	for (int i = 0; i < unencryptedPassword.length(); i++) {
-		unsigned int ascii = ((unsigned char) unencryptedPassword[i]) + offset; // casting before addition
-		int cc = CollatzConjecture(ascii);
-		encryptedPassword.append(std::to_string(cc));
-		offset = cc;
+		unencryptedPassword.push_back(std::char_traits<char>().to_int_type(c));
 	}
 
-	return encryptedPassword;
+	return unencryptedPassword;
 }
-
 
 std::string PasswordManager::GenerateEncryption(const std::vector<unsigned int>& unencryptedPassword) {
 	int offset = 0;
