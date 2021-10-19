@@ -36,6 +36,17 @@ int main() {
 	return 0;
 }
 
+
+std::vector<unsigned int> StringToVector(std::string str) {
+	std::vector<unsigned int> unencryptedPassword;
+
+	for (char& c : str) {
+		unencryptedPassword.push_back(std::char_traits<char>().to_int_type(c));
+	}
+
+	return unencryptedPassword;
+}
+
 PasswordManager::PasswordManager() {
 	passwordFile = new std::fstream;
 
@@ -62,6 +73,9 @@ PasswordManager::~PasswordManager() {
 void PasswordManager::CreateUsernamePassword() {
 	std::string username, unencryptedPass;
 
+	std::vector<unsigned int> (*stringToVectorPtr)(std::string str);
+	stringToVectorPtr = &StringToVector;
+
 	bool usernameGenerated = false;
 	while (!usernameGenerated) {
 		std::cout << "Please enter the new username: ";
@@ -83,14 +97,12 @@ void PasswordManager::CreateUsernamePassword() {
 	}
 	std::cout << "Please enter the new password: ";
 	std::cin >> unencryptedPass;
-
-	//char* char_array = (char*)unencryptedPass.data();
 	
 	// any rules for password to check here? Length etc.
 	int offset = 0;
 
 	// Adding to offset then adding to string
-	std::string encryptedPassword = GenerateEncryption(StringToVector(unencryptedPass));
+	std::string encryptedPassword = GenerateEncryption(stringToVectorPtr(unencryptedPass));
 
 	passwordFile->clear();
 	*passwordFile << "" << username << " " << encryptedPassword << std::endl;
@@ -104,19 +116,23 @@ void PasswordManager::CheckUsernamePassword() {
 
 	std::cout << "Please enter the new username: ";
 	std::cin >> username;
+
+	std::vector<unsigned int>(*stringToVectorPtr)(std::string str);
+	stringToVectorPtr = &StringToVector;
+
 	
 	if (details.contains(username)) {// C++20 feature
 		for (int i = 0; i < 3; ++i) {
 			std::cout << "Please enter the new password: ";
 			std::cin >> unencryptedPass;
-			std::string encryptedPassword = GenerateEncryption(StringToVector(unencryptedPass));
+			std::string encryptedPassword = GenerateEncryption(stringToVectorPtr(unencryptedPass));
 
 			if (details[username] == encryptedPassword) {
-				std::cout << "success!" << std::endl;
+				std::cout << "Success!" << std::endl;
 				break;
 			}
 			else {
-				std::cout << "Failure, you have " << (2 - i) << " remaining attempts." << std::endl;
+				std::cout << "Failure! You have " << (2 - i) << " remaining attempts." << std::endl;
 			}
 		}
 	}
@@ -128,17 +144,12 @@ void PasswordManager::CheckUsernamePassword() {
 void PasswordManager::GeneratePasswordStrengthFile() {
 	std::fstream passwordStrengthFile("passwordtest.txt", std::ios_base::out);
 
-	std::random_device rd; // obtain a random number from hardware
-	std::mt19937 gen(rd()); // seed the generator
-
-	std::uniform_int_distribution<> tenLowercase(97, 122); // define the range
-	std::uniform_int_distribution<> randomChar(0, 9); // define the range
-
 	//clear file first?
 
 	// Randomly choosing the ten characters
-	char characters[10];
-	for (int i = 0; i < 10; ++i) characters[i] = static_cast<int>(tenLowercase(gen)); // only choosing once, as it helps with efficiency of password generation
+	int characters[10];
+	//for (int i = 0; i < 10; ++i) characters[i] = (rand() % (122 + 97)); // only choosing once, as it helps with efficiency of password generation
+	for (int i = 0; i < 10; ++i) characters[i] = 97 + rand() % ((122 + 1) - 97); // only choosing once, as it helps with efficiency of password generation
 	
 	// First 10000
 	for (int i = 0; i < 10000; ++i) {
@@ -146,20 +157,17 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 
 		int passwordLength = i / 100;
 		(i % 100 == 0) ? passwordLength : passwordLength++;
-		std::cout << i << std::endl;
 
 		for (int j = 0; j < passwordLength; ++j) {
-			unencryptedPass.push_back(characters[randomChar(gen)]);
+			//unencryptedPass.push_back(characters[rand() % 9 + 0]);
+			unencryptedPass.push_back(characters[0 + rand() % ((9 + 1) - 0)]);
 		}
 
 		passwordStrengthFile << GenerateEncryption(unencryptedPass) << std::endl;
 	}
 
 	// Second 10000
-	std::uniform_int_distribution<> randomChar2(1, 255); // 0 is undefined behaviour
-
 	for (int i = 0; i < 10000; ++i) {
-		std::cout << i << std::endl;
 		bool repeatedCharacters[256] = { false };
 
 		int passwordLength = i / 100;
@@ -168,7 +176,8 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 		std::vector<unsigned int> unencryptedPass;
 
 		for (int j = 0; j < passwordLength; ++j) {
-			int randomValue = randomChar2(gen);
+			//int randomValue = rand() % 255 + 1; // not 0, breaks collatz
+			int randomValue = 1 + rand() % ((255 + 1) - 1); // not 0, breaks collatz
 			bool placed = false;
 			while (!placed) {
 				if (!repeatedCharacters[randomValue]) {
@@ -177,7 +186,8 @@ void PasswordManager::GeneratePasswordStrengthFile() {
 					placed = true;
 				}
 				else {
-					randomValue = randomChar2(gen); // else, generate new random value
+					//randomValue = rand() % 255 + 1; // else, generate new random value
+					randomValue = 1 + rand() % ((255 + 1) - 1); // else, generate new random value
 				}
 			}
 		}
@@ -202,8 +212,8 @@ void PasswordManager::AnalysePasswordStrengthFile() {
 
 		if (i % 100 == 0) {
 			auto stop = std::chrono::high_resolution_clock::now();
-			int pc = (((double) success / (double) tests) * 100);
-			std::cout << "After " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms, the success rate of " << i << " easy passwords is: " << pc << "%" << std::endl;
+			std::cout << "After " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms, the success rate of " << i << 
+				" simple passwords is: " << (((double)success / (double)tests) * 100) << "%" << std::endl;
 		}
 	}
 
@@ -217,8 +227,8 @@ void PasswordManager::AnalysePasswordStrengthFile() {
 
 		if (i % 100 == 0) {
 			auto stop = std::chrono::high_resolution_clock::now();
-			int pc = (((double)success / (double)tests) * 100);
-			std::cout << "After " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms, the success rate of " << i << " hard passwords is: " << pc << "%" << std::endl;
+			std::cout << "After " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms, the success rate of " << i << 
+				" hard passwords is: " << (((double)success / (double)tests) * 100) << "%" << std::endl;
 		}
 	}
 }
@@ -254,14 +264,16 @@ bool PasswordManager::TestEncryption(std::string encryption, int min, int max) {
 	return true;
 }
 
-std::vector<unsigned int> PasswordManager::StringToVector(std::string str) {
-	std::vector<unsigned int> unencryptedPassword;
-	
-	for (char& c : str) {
-		unencryptedPassword.push_back(std::char_traits<char>().to_int_type(c));
-	}
+int CollatzConjecture(int value) {
+	int stepCount = 0;
 
-	return unencryptedPassword;
+	while (value != 1) {
+		if (value % 2 == 0) value /= 2; //even
+		else value = (value * 3) + 1; //false	
+		
+		stepCount++;
+	}
+	return stepCount;
 }
 
 std::string PasswordManager::GenerateEncryption(const std::vector<unsigned int>& unencryptedPassword) {
@@ -278,14 +290,3 @@ std::string PasswordManager::GenerateEncryption(const std::vector<unsigned int>&
 	return encryptedPassword;
 }
 
-int PasswordManager::CollatzConjecture(int value) {
-	int stepCount = 0;
-
-	while (value != 1) {
-		if (value % 2 == 0) value /= 2; //even
-		else value = (value * 3) + 1; //false	
-		
-		stepCount++;
-	}
-	return stepCount;
-}
