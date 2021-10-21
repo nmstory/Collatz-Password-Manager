@@ -174,7 +174,7 @@ void PasswordManager::GeneratePasswordSet(std::fstream& passwordStrengthFile, bo
 			else {
 				bool placed = false;
 				while (!placed) {
-					randomValue = minASCII + rand() % ((maxASCII + minASCII) - minASCII);
+					randomValue = minASCII + rand() % ((maxASCII + 1) - minASCII);
 					
 					if (!repeatedCharacters[randomValue]) {
 						repeatedCharacters[randomValue] = true;
@@ -274,7 +274,7 @@ std::vector<unsigned int> StringToVector(std::string str) {
 	std::vector<unsigned int> unencryptedPassword;
 
 	for (char& c : str) {
-		unencryptedPassword.push_back(c);
+		unencryptedPassword.push_back(static_cast<unsigned>(static_cast<unsigned char>(c)));
 	}
 
 	return unencryptedPassword;
