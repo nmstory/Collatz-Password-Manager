@@ -11,24 +11,24 @@ int main() {
 		std::cout << "\n" << "1. Create username/password" << "\n" << "2. Check username and password" << "\n" << "3. Generate password strength analysis file" << 
 			"\n" << "4. Analyse password strength analysis file" << "\n" << "5. Exit" << std::endl;
 
-		int input;
+		char input;
 		std::cin >> input;
 
 		switch (input)
 		{
-		case 1:
+		case '1':
 			pm.CreateUsernamePassword();
 			break;
-		case 2:
+		case '2':
 			pm.CheckUsernamePassword();
 			break;
-		case 3:
+		case '3':
 			pm.GeneratePasswordStrengthFile();
 			break;
-		case 4:
+		case '4':
 			pm.AnalysePasswordStrengthFile();
 			break;
-		case 5:
+		case '5':
 			running = false;
 			break;
 		default:
@@ -107,6 +107,7 @@ void PasswordManager::CreateUsernamePassword() {
 	passwordFile->clear();
 	*passwordFile << "" << username << " " << encryptedPassword << std::endl;
 	loginDetails[username] = encryptedPassword;
+	std::cout << "Account created!" << std::endl;
 }
 
 void PasswordManager::CheckUsernamePassword() {
@@ -137,14 +138,30 @@ void PasswordManager::CheckUsernamePassword() {
 
 void PasswordManager::GeneratePasswordStrengthFile() {
 	remove("passwordtest.txt"); // removing the file ensures it's cleared before use
-	std::fstream passwordStrengthFile("passwordtest.txt", std::ios_base::out);
+	std::fstream passwordStrengthFile;
+
+	try {
+		passwordStrengthFile.open("passwordtest.txt", std::ios_base::out);
+	}
+	catch (const std::ios_base::failure& fail) {
+		std::cout << fail.what() << std::endl;
+	}
 
 	GeneratePasswordSet(passwordStrengthFile, true, 97, 122); // Generating first 10000 passwords
+	std::cout << "First 10000 passwords generated." << std::endl;
 	GeneratePasswordSet(passwordStrengthFile, false, 1, 255); // Generating second 10000 passwords
+	std::cout << "Second 10000 passwords generated." << std::endl;
 }
 
 void PasswordManager::AnalysePasswordStrengthFile() {
-	std::fstream passwordStrengthFile("passwordtest.txt", std::ios_base::in);
+	std::fstream passwordStrengthFile;
+
+	try {
+		passwordStrengthFile.open("passwordtest.txt", std::ios_base::in);
+	}
+	catch (const std::ios_base::failure& fail) {
+		std::cout << fail.what() << std::endl;
+	}
 
 	TestEncryptionHandler(97, 127, "simple", passwordStrengthFile);
 	TestEncryptionHandler(1, 255, "hard", passwordStrengthFile);
@@ -158,7 +175,7 @@ void PasswordManager::GeneratePasswordSet(std::fstream& passwordStrengthFile, bo
 		for (int i = 0; i < 10; ++i) characters[i] = minASCII + rand() % ((maxASCII + 1) - minASCII);
 	}
 
-	for (int i = 0; i < 10000; ++i) {
+	for (int i = 1; i < 10001; ++i) {
 		std::vector<unsigned int> unencryptedPass;
 		bool repeatedCharacters[256] = { false };
 
@@ -254,7 +271,7 @@ void PasswordManager::TestEncryptionHandler(int minASCII, int maxASCII, std::str
 			categorySuccess++;
 		}
 
-		if (i % 100 == 0) { // Display success percentage after every category
+		if (i % 100 == 0) { // Display success percentage and average time after every category
 			auto stop = std::chrono::high_resolution_clock::now();
 			double categroryDuration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - categoryTiming).count();
 
